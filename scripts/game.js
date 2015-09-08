@@ -1,4 +1,40 @@
 /*
+ * Stock Option (game for HappyFunTimes)
+ * Based on "Simple" example by Greg Tavares (MIT-like license)
+ *
+ * Copyright 2015, Christiaan Janssen.
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are
+ * met:
+ *
+ *     * Redistributions of source code must retain the above copyright
+ * notice, this list of conditions and the following disclaimer.
+ *     * Redistributions in binary form must reproduce the above
+ * copyright notice, this list of conditions and the following disclaimer
+ * in the documentation and/or other materials provided with the
+ * distribution.
+ *     * Neither the name of Christiaan Janssen, nor the names of its
+ * contributors may be used to endorse or promote products derived from
+ * this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+ * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+ * OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+ * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+ * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+ * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+
+/*  COPYRIGHT NOTICE OF THE ORIGINAL GAME BELOW */
+
+/*
  * Copyright 2014, Gregg Tavares.
  * All rights reserved.
  *
@@ -260,6 +296,7 @@ requirejs([
     updatePlayers();
     updatePrice();
     resetGraph();
+    drawEmptyGraph();
     updateGraph();
 
     timerElemText.innerHTML = "Time left:"
@@ -297,6 +334,37 @@ requirejs([
     // globals.skipStep = globals.maxStoryLen/(graph.width*1.5)
   }
 
+  var drawEmptyGraph = function() {
+    // updatePrice
+    var maxPrice = globals.maxPrice * 1.05
+    var minPrice = globals.minPrice / 1.05
+    var priceDiff = Math.max(maxPrice-minPrice, 1)
+    var border = 40
+    var cy = graph.height
+
+    ctx.fillStyle="#ffffff";
+    ctx.fillRect(0,0,graph.width,cy)
+
+    ctx.strokeStyle="#000"
+    ctx.setLineDash([5])
+    ctx.beginPath();
+    for (var yy=cy/10; yy<cy; yy+=cy/5) {
+      ctx.moveTo(border,yy)
+      ctx.lineTo(graph.width,yy)
+
+    }
+    ctx.stroke();
+    ctx.setLineDash([])
+
+    // values
+    ctx.fillStyle="#000"
+    var pra = function(pr) { return (1-pr/cy) * priceDiff + minPrice; }
+    for (var yy=cy/10; yy<cy; yy+=cy/5) {
+      ctx.fillText(Math.floor(pra(yy)) + " €", 5, yy + 4)
+    }
+
+  }
+
   var updateGraph = function() {
     if (!globals.playing) return;
 
@@ -319,40 +387,45 @@ requirejs([
     var maxPrice = globals.maxPrice * 1.05
     var minPrice = globals.minPrice / 1.05
     var priceDiff = Math.max(maxPrice-minPrice, 1)
-    var ix = graph.width / globals.maxStoryLen
+    var border = 40
+    var ix = (graph.width-border) / globals.maxStoryLen
     var cy = graph.height
+
+    drawEmptyGraph()
+
     var pry = function(pr) { return cy * (1 - (pr-minPrice)/priceDiff) }
 
-    ctx.fillStyle="#ffffff";
-    ctx.fillRect(0,0,graph.width,cy)
+    // ctx.fillStyle="#ffffff";
+    // ctx.fillRect(0,0,graph.width,cy)
 
-    ctx.strokeStyle="#000"
-    ctx.setLineDash([5])
-    ctx.beginPath();
-    for (var yy=cy/10; yy<cy; yy+=cy/5) {
-      ctx.moveTo(40,yy)
-      ctx.lineTo(graph.width,yy)
 
-    }
-    ctx.stroke();
-    ctx.setLineDash([])
+    // ctx.strokeStyle="#000"
+    // ctx.setLineDash([5])
+    // ctx.beginPath();
+    // for (var yy=cy/10; yy<cy; yy+=cy/5) {
+    //   ctx.moveTo(border,yy)
+    //   ctx.lineTo(graph.width,yy)
+
+    // }
+    // ctx.stroke();
+    // ctx.setLineDash([])
 
 
     ctx.strokeStyle="#ff0000"
     ctx.beginPath();
-    ctx.moveTo(0,pry(priceStory[0]));
+    ctx.moveTo(border,pry(priceStory[0]));
     for (var i=1; i<priceStory.length; i++) {
-        ctx.lineTo(i * ix, pry(priceStory[i]));
+        ctx.lineTo(i * ix + border, pry(priceStory[i]));
     }
     ctx.stroke();
 
 
-    // values
-    ctx.fillStyle="#000"
-    var pra = function(pr) { return (1-pr/cy) * priceDiff + minPrice; }
-    for (var yy=cy/10; yy<cy; yy+=cy/5) {
-      ctx.fillText(Math.floor(pra(yy)) + " €", 5, yy + 4)
-    }
+    // // values
+    // ctx.fillStyle="#000"
+    // var pra = function(pr) { return (1-pr/cy) * priceDiff + minPrice; }
+    // for (var yy=cy/10; yy<cy; yy+=cy/5) {
+    //   ctx.fillText(Math.floor(pra(yy)) + " €", 5, yy + 4)
+    // }
 
 
   }
@@ -361,6 +434,7 @@ requirejs([
 
 
   resetGraph();
+  drawEmptyGraph();
   GameSupport.run(globals, render);
 });
 
