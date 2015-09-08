@@ -75,29 +75,36 @@ requirejs([
     'hft/gamesupport',
     'hft/misc/misc',
   ], function(GameServer, GameSupport, Misc) {
-  var rankElem = document.getElementById("rank");
-  var statsElem = document.getElementById("stats");
-  var timerElemCount = document.getElementById("timerCnt");
-  var timerElemText = document.getElementById("timerTxt");
-  var timerElemContainer = document.getElementById("timerContainer");
-  var graph = document.getElementById("graph");
-  var ctx = graph.getContext("2d");
+
+  var elementCache = {
+    rank : document.getElementById("rank"),
+    stats: document.getElementById("stats"),
+    timerAmount : document.getElementById("timerAmount"),
+    timerText : document.getElementById("timerTxt"),
+    timerContainer : document.getElementById("timerContainer"),
+    graph : document.getElementById("graph"),
+  };
+  var ctx = elementCache.graph.getContext("2d");
+
   var players = [];
-  var priceStory = [];
+
+  var gameData = {
+    priceStory : [],
+    currentPrice : 100,
+  };
   var globals = {
-      currentPrice : 100,
-      incPrice : 1,
-      decPrice : 1,
       rankDirty : true,
       priceChanged : true,
       playing: false,
-      totalTime: 80,
-      preTime: 5,
+
+      totalTime: 10,
+      explicitStartTime : 5,
+      autoStartTime : 15,
+      preTime: 15,
 
       maxStoryLen:1024,
       skip:0,
       skipStep:3,
-
   };
   Misc.applyUrlSettings(globals);
 
@@ -116,12 +123,12 @@ requirejs([
     netPlayer.addEventListener('setName', Player.prototype.setName.bind(this));
 
     this.updateStats();
-    this.netPlayer.sendCmd('updateprice', { currentPrice: globals.currentPrice });
+    this.netPlayer.sendCmd('updateprice', { currentPrice: gameData.currentPrice });
 
     globals.rankDirty = true;
+
   };
 
-  // The player disconnected.
   Player.prototype.disconnect = function() {
     globals.rankDirty = true;
     for (var ii = 0; ii < players.length; ++ii) {
@@ -135,11 +142,11 @@ requirejs([
 
   Player.prototype.buyStock = function(cmd) {
     if (!globals.playing) return
-    if (this.cash >= globals.currentPrice) {
+    if (this.cash >= gameData.currentPrice) {
         globals.rankDirty = true;
-        this.cash -= globals.currentPrice;
+        this.cash -= gameData.currentPrice;
         this.stock++;
-        globals.currentPrice += globals.incPrice;
+        gameData.currentPrice ++;
         globals.priceChanged = true;
         this.updateStats();
     }
@@ -149,10 +156,10 @@ requirejs([
     if (!globals.playing) return
     if (this.stock > 0) {
       globals.rankDirty = true;
-      this.cash += globals.currentPrice
+      this.cash += gameData.currentPrice
       this.stock--;
-      if (globals.currentPrice >= globals.decPrice) {
-        globals.currentPrice -= globals.decPrice;
+      if (gameData.currentPrice >= 1) {
+        gameData.currentPrice --;
         globals.priceChanged = true;
       }
       this.updateStats();
@@ -185,6 +192,10 @@ requirejs([
   server.addEventListener('playerconnect', function(netPlayer, name) {
     globals.rankDirty = true;
     players.push(new Player(netPlayer, name));
+    if (players.length >= 2 && !globals.playing && globals.startDate === undefined) {
+      globals.preTime = globals.autoStartTime;
+      prepareGame();
+    }
   });
 
 
@@ -192,7 +203,7 @@ requirejs([
     if (!globals.rankDirty) return;
     globals.rankDirty = false;
     players.sort(function(a,b) { return a.cash < b.cash })
-    rankElem.innerHTML = ""; // clear
+    elementCache.rank.innerHTML = ""; // clear
 
     var addCol = function(tr, txt, w) {
         var td = document.createElement('td');
@@ -206,8 +217,6 @@ requirejs([
     }
 
     var tbl = document.createElement('table');
-    // tbl.style="border-style:solid;border-color:#000;border-width:thin;"
-    // header
     var tr = document.createElement('tr');
     tr.style = "border-style:solid;border-color:#000;border-width:thin;"
     addCol(tr, "RANK", 50);
@@ -225,11 +234,11 @@ requirejs([
         addCol(tr, players[i].stock + " u ", 130)
         tbl.appendChild(tr);
     }
-    rankElem.appendChild(tbl)
+    elementCache.rank.appendChild(tbl)
   };
 
   var updatePrice = function() {
-    statsElem.innerHTML = globals.currentPrice;
+    elementCache.stats.innerHTML = gameData.currentPrice;
 
   };
 
@@ -237,7 +246,7 @@ requirejs([
     if (!globals.priceChanged) return;
     globals.priceChanged = false;
     var priceObj = {
-        currentPrice: globals.currentPrice,
+        currentPrice: gameData.currentPrice,
       };
     for (var i = 0; i < players.length; i++) {
       players[i].netPlayer.sendCmd('updateprice', priceObj);
@@ -253,12 +262,12 @@ requirejs([
 
 
       } else {
-        globals.endDate = globals.startDate + globals.totalTime * 1000; // 80 seconds
+        globals.endDate = globals.startDate + globals.totalTime * 1000;
         globals.startDate = undefined;
         restartGame();
       }
 
-      timerElemCount.innerHTML = Math.ceil(restTime/1000);
+      elementCache.timerAmount.innerHTML = Math.ceil(restTime/1000);
 
     }
 
@@ -268,9 +277,13 @@ requirejs([
         restTime = 0;
         globals.endDate = undefined;
         globals.playing = false;
+        if (players.length >= 2) {
+          globals.preTime = globals.autoStartTime;
+          prepareGame();
+        }
       }
 
-      timerElemCount.innerHTML = Math.ceil(restTime/1000);
+      elementCache.timerAmount.innerHTML = Math.ceil(restTime/1000);
     }
   }
 
@@ -289,7 +302,7 @@ requirejs([
       players[i].stock = 10;
       players[i].updateStats();
     }
-    globals.currentPrice = 100;
+    gameData.currentPrice = 100;
     globals.rankDirty = true;
     globals.priceChanged = true;
     sortPlayers();
@@ -299,24 +312,24 @@ requirejs([
     drawEmptyGraph();
     updateGraph();
 
-    timerElemText.innerHTML = "Time left:"
-    timerElemContainer.style="color:#000;"
+    elementCache.timerText.innerHTML = "Time left:"
+    elementCache.timerContainer.style="color:#000;"
     globals.playing = true
   }
 
   var prepareGame = function() {
-    restartGame()
-
     globals.startDate = getTime() + globals.preTime * 1000;
     globals.endDate = undefined;
-    timerElemText.innerHTML = "Game starting in:"
-    timerElemContainer.style="color:#F00;"
+    elementCache.timerText.innerHTML = "Game starting in:"
+    elementCache.timerContainer.style="color:#F00;"
     globals.playing = false
   }
 
   // restart
   window.addEventListener("keydown", function(event) {
     if (event.keyCode == 32) {
+      globals.preTime = globals.explicitStartTime;
+      restartGame();
       prepareGame();
     }
   } );
@@ -325,19 +338,20 @@ requirejs([
 
   ///////////////// GRAPH
   var resetGraph = function() {
+    var graph = elementCache.graph;
     ctx.fillStyle="#ffffff";
     ctx.fillRect(0,0,graph.width,graph.height)
-    priceStory = [];
-    globals.maxPrice = 120
-    globals.minPrice = 80
+    gameData.priceStory = [];
+    gameData.maxPrice = 120
+    gameData.minPrice = 80
     globals.skip = 0
-    // globals.skipStep = globals.maxStoryLen/(graph.width*1.5)
   }
 
   var drawEmptyGraph = function() {
     // updatePrice
-    var maxPrice = globals.maxPrice * 1.05
-    var minPrice = globals.minPrice / 1.05
+    var graph = elementCache.graph;
+    var maxPrice = gameData.maxPrice * 1.05
+    var minPrice = gameData.minPrice / 1.05
     var priceDiff = Math.max(maxPrice-minPrice, 1)
     var border = 40
     var cy = graph.height
@@ -377,15 +391,15 @@ requirejs([
 
 
     // updatePrice
-    priceStory.push(globals.currentPrice)
-    if (globals.currentPrice > globals.maxPrice) globals.maxPrice = globals.currentPrice;
-    if (globals.currentPrice < globals.minPrice) globals.minPrice = globals.currentPrice;
-    if (priceStory.length > globals.maxStoryLen) {
-        priceStory.splice(0,priceStory.length - globals.maxStoryLen);
+    gameData.priceStory.push(gameData.currentPrice)
+    if (gameData.currentPrice > gameData.maxPrice) gameData.maxPrice = gameData.currentPrice;
+    if (gameData.currentPrice < gameData.minPrice) gameData.minPrice = gameData.currentPrice;
+    if (gameData.priceStory.length > globals.maxStoryLen) {
+        gameData.priceStory.splice(0,gameData.priceStory.length - globals.maxStoryLen);
     }
 
-    var maxPrice = globals.maxPrice * 1.05
-    var minPrice = globals.minPrice / 1.05
+    var maxPrice = gameData.maxPrice * 1.05
+    var minPrice = gameData.minPrice / 1.05
     var priceDiff = Math.max(maxPrice-minPrice, 1)
     var border = 40
     var ix = (graph.width-border) / globals.maxStoryLen
@@ -395,44 +409,19 @@ requirejs([
 
     var pry = function(pr) { return cy * (1 - (pr-minPrice)/priceDiff) }
 
-    // ctx.fillStyle="#ffffff";
-    // ctx.fillRect(0,0,graph.width,cy)
-
-
-    // ctx.strokeStyle="#000"
-    // ctx.setLineDash([5])
-    // ctx.beginPath();
-    // for (var yy=cy/10; yy<cy; yy+=cy/5) {
-    //   ctx.moveTo(border,yy)
-    //   ctx.lineTo(graph.width,yy)
-
-    // }
-    // ctx.stroke();
-    // ctx.setLineDash([])
-
-
     ctx.strokeStyle="#ff0000"
     ctx.beginPath();
-    ctx.moveTo(border,pry(priceStory[0]));
-    for (var i=1; i<priceStory.length; i++) {
-        ctx.lineTo(i * ix + border, pry(priceStory[i]));
+    ctx.moveTo(border,pry(gameData.priceStory[0]));
+    for (var i=1; i<gameData.priceStory.length; i++) {
+        ctx.lineTo(i * ix + border, pry(gameData.priceStory[i]));
     }
     ctx.stroke();
-
-
-    // // values
-    // ctx.fillStyle="#000"
-    // var pra = function(pr) { return (1-pr/cy) * priceDiff + minPrice; }
-    // for (var yy=cy/10; yy<cy; yy+=cy/5) {
-    //   ctx.fillText(Math.floor(pra(yy)) + " €", 5, yy + 4)
-    // }
-
 
   }
   ///////////////// GRAPH
 
 
-
+  ///////////////////// FINAL INITIALIZATION
   resetGraph();
   drawEmptyGraph();
   GameSupport.run(globals, render);
