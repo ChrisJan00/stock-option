@@ -97,7 +97,7 @@ requirejs([
       priceChanged : true,
       playing: false,
 
-      totalTime: 10,
+      totalTime: 80,
       explicitStartTime : 5,
       autoStartTime : 15,
       preTime: 15,
